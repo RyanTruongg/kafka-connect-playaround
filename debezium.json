@@ -9,6 +9,10 @@
     "database.password": "docker",
     "database.dbname": "exampledb",
     "database.server.name": "postgres",
-    "table.include.list": "public.student"
+    "table.include.list": "public.student",
+    "key.converter.schemas.enable": false,
+    "value.converter.schemas.enable": false,
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState"
   }
 }
