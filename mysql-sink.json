@@ -9,8 +9,8 @@
     "connection.password": "mysql",
     "auto.create": true,
     "auto.evolve": true,
-    "insert.mode": "insert",
-
+    "insert.mode": "upsert",
+    "delete.enabled": "true",
     "table.name.format": "student",
     "key.converter": "io.confluent.connect.avro.AvroConverter",
     "value.converter": "io.confluent.connect.avro.AvroConverter",

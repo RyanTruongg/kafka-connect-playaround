@@ -1,1 +1,5 @@
 /tmp
+
+rsa_key.p8
+rsa_key.pub
+snowflake-sink-local.json

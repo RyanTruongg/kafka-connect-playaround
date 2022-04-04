@@ -63,21 +63,58 @@ services:
     ports:
       - 9092:9092
 
-  debezium:
-    image: mydebezium
-    container_name: debezium
+  connect-base:
+    image: confluentinc/cp-kafka-connect-base:7.0.1
+    container_name: connect-base
     environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: connect_configs
-      OFFSET_STORAGE_TOPIC: connect_offsets
-      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
-      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_GROUP_ID: compose-connect-group
+      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
+      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      # CLASSPATH required due to CC-2422
+      CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-7.0.2.jar
+      CONNECT_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
+      CONNECT_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_LOGGERS: org.apache.zookeeper=ERROR,org.I0Itec.zkclient=ERROR,org.reflections=ERROR
     depends_on: [kafka]
     ports:
       - 8083:8083
+
+    command:
+      - bash
+      - -c
+      - |
+        echo "Installing connector plugins"
+        echo "Elastic search"
+        confluent-hub install --no-prompt confluentinc/kafka-connect-elasticsearch:11.0.1
+        echo "Snowflake"
+        confluent-hub install --no-prompt snowflakeinc/snowflake-kafka-connector:1.7.1
+        echo "JDBC"
+        confluent-hub install --no-prompt confluentinc/kafka-connect-jdbc:10.3.3
+        echo "Postgres"
+        confluent-hub install --no-prompt debezium/debezium-connector-postgresql:1.8.1
+        echo "Download mysql jdbc driver"
+
+        cd /usr/share/confluent-hub-components/confluentinc-kafka-connect-jdbc
+        curl -L https://downloads.mysql.com/archives/get/p/3/file/mysql-connector-java-8.0.27.tar.gz -o mysql.tar.gz
+        tar -xf mysql.tar.gz
+        mv mysql-connector-java-8.0.27/mysql-connector-java-8.0.27.jar .
+
+        echo "Launching Kafka Connect worker"
+        /etc/confluent/docker/run & 
+
+        sleep infinity
 
   schema-registry:
     container_name: schema-registry
@@ -96,7 +133,7 @@ services:
     container_name: ksqldb-server
     depends_on:
       - kafka
-      - debezium
+      - connect-base
     ports:
       - "8088:8088"
     environment:
@@ -108,7 +145,7 @@ services:
       KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
       KSQL_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
-      KSQL_KSQL_CONNECT_URL: "http://debezium:8083"
+      KSQL_KSQL_CONNECT_URL: "http://connect-base:8083"
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 1
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
@@ -120,13 +157,13 @@ services:
     depends_on:
       - kafka
       - schema-registry
-      - debezium
+      - connect-base
       - ksqldb-server
     ports:
       - "9021:9021"
     environment:
       CONTROL_CENTER_BOOTSTRAP_SERVERS: "kafka:9092"
-      CONTROL_CENTER_CONNECT_CONNECT-DEFAULT_CLUSTER: "http://debezium:8083"
+      CONTROL_CENTER_CONNECT_CONNECT-DEFAULT_CLUSTER: "http://connect-base:8083"
       CONTROL_CENTER_KSQL_KSQLDB1_URL: "http://ksqldb-server:8088"
       CONTROL_CENTER_KSQL_KSQLDB1_ADVERTISED_URL: "http://localhost:8088"
       CONTROL_CENTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"

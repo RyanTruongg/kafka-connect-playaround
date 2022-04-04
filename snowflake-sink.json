@@ -1,0 +1,22 @@
+{
+  "name": "snowflake-sink",
+  "config": {
+    "connector.class": "com.snowflake.kafka.connector.SnowflakeSinkConnector",
+    "tasks.max": "1",
+    "topics": "postgres.public.student",
+    "buffer.count.records": "10000",
+    "buffer.flush.time": "60",
+    "buffer.size.bytes": "5000000",
+    "snowflake.url.name": "organization***-username***.snowflakecomputing.com:443",
+    "snowflake.user.name": "***",
+    "snowflake.private.key": "***",
+    "snowflake.private.key.passphrase": "***",
+    "snowflake.database.name": "exampledb",
+    "snowflake.schema.name": "student",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "schema.registry.url": "http://schema-registry:8081"
+  }
+}
